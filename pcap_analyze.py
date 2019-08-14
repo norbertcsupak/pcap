@@ -1,4 +1,5 @@
 import argparse
+from enum import Enum
 import os
 import sys
 from scapy.utils import RawPcapReader
@@ -72,8 +73,8 @@ def process_pcap(file_name ,srv ,cli):
 
 
     print ('%s contains of all the %s , intersting packagees %s' %(file_name, count, interesting_packet_count))
-    print ('First package in connection : Packet# %s %s' %(first_pkt_ordinal , printable_timestamp(first_pkt_timestamp,first_pkt_timestamp_resoluton)))
-    print ('Last package in connection: Packet # %s %s' %(last_pkt_ordinal,printable_timestamp(last_pkt_timestamp,last_pkt_timestamp_resolution)))
+#    print ('First package in connection : Packet# %s %s' %(first_pkt_ordinal, printable_timestamp(first_pkt_timestamp,first_pkt_timestamp_resoluton)))
+    print ('Last package in connection: Packet # %s %s' %(last_pkt_ordinal, printable_timestamp(last_pkt_timestamp,last_pkt_timestamp_resolution)))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PCAP reader')
