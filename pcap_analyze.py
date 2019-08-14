@@ -6,6 +6,7 @@ from scapy.utils import RawPcapReader
 from scapy.layers.l2 import Ether
 from scapy.layers.inet import IP, TCP
 import time
+from enum import Enum
 
 class PktDirection(Enum):
     not_defined = 0
@@ -26,6 +27,9 @@ def process_pcap(file_name ,srv ,cli):
     (server_ip, server_port) = srv.split(':')
     (client_ip, client_port) = cli.split(':')
 
+    server_sequence_offset = None
+    client_sequence_offset = None
+
     for (pkd_data, pkt_metadata) in RawPcapReader(file_name):
 
         count +=1
@@ -42,24 +46,34 @@ def process_pcap(file_name ,srv ,cli):
             continue
 
         direction = PktDirection.not_defined
-
-        if (ip_pkt.src != server_ip) and (ip_pkt.src != client_ip):
-            # Uninteresting source IP address
-            continue
-
-        if (ip_pkt.dst != server_ip) and (ip_pkt.dst != client_ip):
-            # Uninteresting destination IP address
-            continue
-
         tcp_pkt = ip_pkt[TCP]
 
+        if ip_pkt.src == client_ip:
+            if tcp_pkt.sport != client_ip:
+                continue
 
-        if (tcp_pkt.sport != int(server_port) and tcp_pkt.sport != int(client_port)):
+            if ip_pkt.dst != server_ip:
+                continue
+
+            if tcp_pkt.dport != int(server_port):
+                continue
+
+            direction = PktDirection.client_to_server
+
+        elif ip_pkt.src == server_ip:
+            if tcp_pkt.sport != int(server_port):
+                continue
+
+            if ip_pkt.dst != client_ip:
+                continue
+
+            if tcp_pkt.dport != int(client_port):
+                continue
+
+            direction = PktDirection.server_to_client
+
+        else :
             continue
-        if (tcp_pkt.dport != int(server_port) and tcp_pkt.dport != int(client_port)):
-            continue
-
-
 
         interesting_packet_count += 1
 
@@ -71,9 +85,22 @@ def process_pcap(file_name ,srv ,cli):
         last_pkt_timestamp_resolution = pkt_metadata.tsresol
         last_pkt_ordinal = count
 
+        this_pkt_relative_timestamp = last_pkt_timestamp - first_pkt_timestamp
+
+        if direction == PktDirection.client_to_server:
+            if client_sequence_offset is None:
+                client_sequence_offset = tcp_pkt.seq
+            relative_offset_seq = tcp_pkt.seq - client_sequence_offset
+
+        else :
+            assert direction == PktDirection.server_to_client
+            if server_sequence_offset is None:
+                server_sequence_offset = tcp_pkt.seq
+            relative_offset_seq = tcp_pkt.seq - server_sequence_offset
+
 
     print ('%s contains of all the %s , intersting packagees %s' %(file_name, count, interesting_packet_count))
-#    print ('First package in connection : Packet# %s %s' %(first_pkt_ordinal, printable_timestamp(first_pkt_timestamp,first_pkt_timestamp_resoluton)))
+    print ('First package in connection : Packet# %s %s' %(first_pkt_ordinal, printable_timestamp(first_pkt_timestamp,first_pkt_timestamp_resoluton)))
     print ('Last package in connection: Packet # %s %s' %(last_pkt_ordinal, printable_timestamp(last_pkt_timestamp,last_pkt_timestamp_resolution)))
 
 if __name__ == '__main__':
