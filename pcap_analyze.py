@@ -19,6 +19,27 @@ def printable_timestamp(ts,resol):
     ts_se_str = time.strftime('%Y-%m-%d %H:%M:%s', time.localtime(ts_sec))
     return  ('%s.%s' %(ts_se_str,ts_subsec))
 
+def print_frames(file_name, srv, cli):
+    print (' Opening file : %s' % file_name)
+    count = 0
+    (server_ip, server_port) = srv.split(':')
+    (client_ip, client_port) = cli.split(':')
+
+    for (pkt_data,pkt_metadata) in RawPcapReader(file_name):
+        count +=1
+        eframe_meta = Ether(pkt_metadata)
+        eframe_data = Ether(pkt_data)
+        l3_data = eframe_data[IP]
+        l4_data = eframe_data[TCP]
+        print (eframe_data.fields)
+        print ('ID:%s  Frame metadata: %s  L3_Data: %s  L4_Data: %s' % (count,eframe_meta,l3_data.fields,l4_data.fields ))
+        if count <10:
+            continue
+        else:
+            break
+
+
+
 def process_pcap(file_name ,srv ,cli):
     print ('Opening {} ...'.format(file_name))
     count = 0
@@ -118,6 +139,7 @@ if __name__ == '__main__':
         print('"{}" does not exists'.format(file_name))
         sys.exit(-1)
 
-    process_pcap(file_name, server, client)
+    #process_pcap(file_name, server, client)
+    print_frames(file_name, server, client)
     sys.exit(0)
 
