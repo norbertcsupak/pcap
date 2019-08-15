@@ -31,8 +31,13 @@ def print_frames(file_name, srv, cli):
         eframe_data = Ether(pkt_data)
         l3_data = eframe_data[IP]
         l4_data = eframe_data[TCP]
-        print (eframe_data.fields)
-        print ('ID:%s  Frame metadata: %s  L3_Data: %s  L4_Data: %s' % (count,eframe_meta,l3_data.fields,l4_data.fields ))
+        tcp_payload_len = l3_data.len - (l3_data.ihl * 4) - (l4_data.dataofs * 4)
+        #print (eframe_data.fields)
+        print ('ID:%s  Frame metadata: %s ' % (count, eframe_meta))
+        print ('L3_data:%s' % l3_data.fields)
+        print ('L4_data:%s' % l4_data.fields)
+        print ('L3 frag:%s' % l3_data.frag)
+        print ('L4 payload_lenght:%s' % tcp_payload_len)
         if count <10:
             continue
         else:
@@ -119,6 +124,11 @@ def process_pcap(file_name ,srv ,cli):
                 server_sequence_offset = tcp_pkt.seq
             relative_offset_seq = tcp_pkt.seq - server_sequence_offset
 
+        if (ip_pkt.flags == 'MF' ) or (ip_pkt.frag != 0 ):
+            print('No support for fragmented IP packages')
+            break
+
+        tcp_payload_len = ip_pkt.len - (ip_pkt.ihl*4 ) - (tcp_pkt.dataofs * 4)
 
     print ('%s contains of all the %s , intersting packagees %s' %(file_name, count, interesting_packet_count))
     print ('First package in connection : Packet# %s %s' %(first_pkt_ordinal, printable_timestamp(first_pkt_timestamp,first_pkt_timestamp_resoluton)))
@@ -139,7 +149,7 @@ if __name__ == '__main__':
         print('"{}" does not exists'.format(file_name))
         sys.exit(-1)
 
-    #process_pcap(file_name, server, client)
+    process_pcap(file_name, server, client)
     print_frames(file_name, server, client)
     sys.exit(0)
 
