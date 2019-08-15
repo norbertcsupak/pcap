@@ -6,6 +6,7 @@ from scapy.utils import RawPcapReader
 from scapy.layers.l2 import Ether
 from scapy.layers.inet import IP, TCP
 import time
+import pickle
 from enum import Enum
 
 class PktDirection(Enum):
@@ -43,6 +44,61 @@ def print_frames(file_name, srv, cli):
         else:
             break
 
+def create_pickle(pcap_file, pickle_out, srv, cli):
+    print('Opening a pcap file for pickling.... %s' % pcap_file)
+    count = 0
+    interesting_packages = 0
+    server_sequence_offset = None
+    client_sequence_offset = None
+
+    (server_ip, server_port) = srv.split(':')
+    (client_ip, client_port) = cli.split(':')
+    packets_for_analysis = []
+
+    for (pkt_data, pkt_metadata) in RawPcapReader(pcap_file):
+        count +=1
+        ether_pkt = Ether(pkt_data)
+
+        if 'type' not in ether_pkt.fields:
+            # LLC frames will have 'len' instead of 'type'.
+            # We disregard those
+            continue
+
+        if ether_pkt.type != 0x0800:
+            # disregard non-IPv4 packets
+            continue
+
+        ip_pkt = ether_pkt[IP]
+
+        if ip_pkt.proto != 6:
+            # Ignore non-TCP packet
+            continue
+
+        tcp_pkt = ip_pkt[TCP]
+
+        # Determine the TCP payload length. IP fragmentation will mess up this
+        # logic, so first check that this is an unfragmented packet
+        if (ip_pkt.flags == 'MF') or (ip_pkt.frag != 0):
+            print('No support for fragmented IP packets')
+            return False
+
+        tcp_payload_len = ip_pkt.len - (ip_pkt.ihl * 4) - (tcp_pkt.dataofs * 4)
+
+        pkt_data = {}
+        pkt_data['src'] = ip_pkt.src
+        pkt_data['dest'] = ip_pkt.dst
+        pkt_data['ip_flags'] = ip_pkt.flags
+        pkt_data['sport'] = tcp_pkt.sport
+        pkt_data['dport'] =tcp_pkt.dport
+
+        packets_for_analysis.append(pkt_data)
+
+        print('Writing to  pickle file:%s' % pickle_out )
+        with open(pickle_out,'w') as pickle_fd:
+            pickle.dump(client,pickle_fd)
+            pickle.dump(server,pickle_fd)
+            pickle.dump(packets_for_analysis, pickle_fd)
+        print ('done.')
 
 
 def process_pcap(file_name ,srv ,cli):
@@ -140,6 +196,8 @@ if __name__ == '__main__':
     parser.add_argument('--server', metavar=' <server address>', help=' specify the server address', required=True)
     parser.add_argument('--client', metavar=' <client address>', help=' specify the  client address', required=False)
 
+
+
     args = parser.parse_args()
     file_name = args.pcap
     server = args.server
@@ -151,5 +209,6 @@ if __name__ == '__main__':
 
     process_pcap(file_name, server, client)
     print_frames(file_name, server, client)
+    create_pickle(file_name, 'befott', server, client)
     sys.exit(0)
 
